@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedSafe - Intelligent Medication Interaction Checker</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        @keyframes pulseWarning {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        
+        .warning-pulse {
+            animation: pulseWarning 2s infinite;
+        }
+        
+        .drug-card {
+            transition: all 0.3s ease;
+        }
+        
+        .drug-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+        
+        .severity-high {
+            border-left: 5px solid #ef4444;
+        }
+        
+        .severity-medium {
+            border-left: 5px solid #f59e0b;
+        }
+        
+        .severity-low {
+            border-left: 5px solid #10b981;
+        }
+        
+        .severity-info {
+            border-left: 5px solid #3b82f6;
+        }
+        
+        .interaction-card {
+            transition: all 0.3s ease;
+        }
+        
+        .interaction-card:hover {
+            transform: scale(1.02);
+        }
+        
+        .fade-in {
+            animation: fadeIn 0.5s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .medication-input {
+            transition: all 0.3s ease;
+        }
+        
+        .medication-input:focus {
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+        }
+
+        .chatbot-message {
+            max-width: 85%;
+            word-wrap: break-word;
+        }
+
+        .user-message {
+            background-color: #f3f4f6;
+            color: #1f2937;
+            margin-left: auto;
+            margin-right: 0;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <!-- Header -->
+        <header class="mb-10 text-center">
+            <div class="flex items-center justify-center mb-4">
+                <i class="fas fa-pills text-4xl text-blue-600 mr-3"></i>
+                <h1 class="text-4xl font-bold text-gray-800">MedSafe</h1>
+            </div>
+            <p class="text-xl text-gray-600 max-w-3xl mx-auto">
+                Intelligent Medication Interaction Checker - Identify potential drug interactions and keep your patients safe
+            </p>
+        </header>
+
+        <!-- Main Content -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <!-- Medication Input Section -->
+            <div class="lg:col-span-2 bg-white rounded-xl shadow-md p-6">
+                <div class="flex items-center justify-between mb-6">
+                    <h2 class="text-2xl font-semibold text-gray-800">Patient Medication List</h2>
+                    <button id="demo-btn" class="px-4 py-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 transition">
+                        <i class="fas fa-vial mr-2"></i>Load Demo
+                    </button>
+                </div>
+                
+                <div class="mb-6">
+                    <div class="flex items-center mb-2">
+                        <i class="fas fa-search text-gray-500 mr-2"></i>
+                        <input type="text" id="drug-search" placeholder="Search for a medication..." class="medication-input w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500">
+                    </div>
+                    <div id="search-results" class="hidden absolute z-10 mt-1 w-full max-h-60 overflow-auto bg-white border border-gray-300 rounded-lg shadow-lg"></div>
+                </div>
+                
+                <div id="medication-list" class="space-y-3 mb-6">
+                    <!-- Medications will be added here -->
+                </div>
+                
+                <div class="flex items-center">
+                    <button id="add-med-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition mr-4">
+                        <i class="fas fa-plus mr-2"></i>Add Medication
+                    </button>
+                    <button id="check-interactions" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-shield-alt mr-2"></i>Check Interactions
+                    </button>
+                </div>
+                
+                <!-- Patient Factors Section -->
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <h3 class="text-lg font-medium text-gray-800 mb-4">
+                        <i class="fas fa-user-circle mr-2 text-blue-500"></i>Patient-Specific Factors
+                    </h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Age</label>
+                            <input type="number" id="patient-age" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Weight (kg)</label>
+                            <input type="number" id="patient-weight" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Conditions</label>
+                            <input type="text" id="patient-conditions" placeholder="e.g., diabetes, hypertension" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                        </div>
+                    </div>
+                    <button id="export-btn" class="mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">
+                        <i class="fas fa-file-excel mr-2"></i>Export Patient Data
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Results Section -->
+            <div class="bg-white rounded-xl shadow-md p-6">
+                <h2 class="text-2xl font-semibold text-gray-800 mb-6">Interaction Results</h2>
+                
+                <div id="visualization-container" class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <h3 class="text-lg font-medium mb-3">Severity Distribution</h3>
+                        <canvas id="severityChart" height="250"></canvas>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-medium mb-3">Drug Interaction Network</h3>
+                        <canvas id="networkChart" height="250"></canvas>
+                    </div>
+                    <div class="md:col-span-2">
+                        <h3 class="text-lg font-medium mb-3">Interaction Timeline</h3>
+                        <canvas id="timelineChart" height="150"></canvas>
+                    </div>
+                </div>
+                
+                <div id="results-container" class="space-y-4">
+                    <div class="text-center py-10 text-gray-400">
+                        <i class="fas fa-search fa-3x mb-4"></i>
+                        <p>Add medications and check for interactions to see results</p>
+                    </div>
+                </div>
+                
+                <div id="severity-legend" class="mt-6 hidden">
+                    <h3 class="text-sm font-medium text-gray-500 uppercase tracking-wider mb-2">Severity Legend</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                            <span class="text-sm">High Risk</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                            <span class="text-sm">Medium Risk</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            <span class="text-sm">Low Risk</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                            <span class="text-sm">Information</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Features Section -->
+        <div class="mt-16">
+            <h2 class="text-2xl font-semibold text-center text-gray-800 mb-8">Key Features</h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="text-blue-500 mb-4">
+                        <i class="fas fa-brain fa-2x"></i>
+                    </div>
+                    <h3 class="text-xl font-medium mb-2">AI-Powered Detection</h3>
+                    <p class="text-gray-600">Our advanced algorithm analyzes thousands of potential drug interactions in seconds.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="text-green-500 mb-4">
+                        <i class="fas fa-user-md fa-2x"></i>
+                    </div>
+                    <h3 class="text-xl font-medium mb-2">Patient-Specific Analysis</h3>
+                    <p class="text-gray-600">Considers age, weight, and medical conditions for personalized interaction assessment.</p>
+                </div>
+                
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <div class="text-purple-500 mb-4">
+                        <i class="fas fa-lightbulb fa-2x"></i>
+                    </div>
+                    <h3 class="text-xl font-medium mb-2">Alternative Suggestions</h3>
+                    <p class="text-gray-600">Provides safer medication alternatives when dangerous interactions are detected.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Chatbot -->
+    <div id="chatbot-container" class="fixed bottom-6 right-6 w-80 bg-white rounded-t-xl shadow-xl z-50 hidden">
+        <div class="bg-blue-600 text-white p-3 rounded-t-xl flex justify-between items-center">
+            <h3 class="font-medium">MedSafe AI Assistant</h3>
+            <button id="close-chatbot" class="text-white hover:text-blue-200">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div id="chatbot-messages" class="p-4 h-64 overflow-y-auto bg-gray-50">
+            <div class="chatbot-message bg-blue-100 text-blue-800 p-3 rounded-lg mb-2">
+                <p>Hello! I'm your MedSafe AI assistant. I can help you with:</p>
+                <ul class="list-disc pl-5 mt-2">
+                    <li>Checking drug interactions</li>
+                    <li>Explaining side effects</li>
+                    <li>Proper medication timing</li>
+                    <li>Finding alternatives</li>
+                    <li>Food/drink interactions</li>
+                    <li>Missed dose guidance</li>
+                </ul>
+                <p class="mt-2">What would you like to know about your medications?</p>
+            </div>
+        </div>
+        <div class="p-3 border-t border-gray-200 bg-white">
+            <div class="flex">
+                <input id="chatbot-input" type="text" placeholder="Ask about medications..." 
+                    class="flex-1 px-3 py-2 border border-gray-300 rounded-l-lg focus:outline-none focus:ring-1 focus:ring-blue-500">
+                <button id="send-chatbot" class="px-4 py-2 bg-blue-600 text-white rounded-r-lg hover:bg-blue-700">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <button id="chatbot-toggle" class="fixed bottom-6 right-6 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg hover:bg-blue-700 flex items-center justify-center z-40">
+        <i class="fas fa-robot text-xl"></i>
+    </button>
+
+    <script>
+        // Drug database (simplified for demo)
+        const drugDatabase = {
+            "warfarin": {
+                name: "Warfarin",
+                type: "Anticoagulant",
+                interactions: {
+                    "ibuprofen": {
+                        severity: "high",
+                        description: "Increased risk of bleeding",
+                        mechanism: "NSAIDs like ibuprofen can increase the anticoagulant effect of warfarin and also inhibit platelet function, leading to an increased risk of bleeding.",
+                        management: "Consider alternative pain relievers like acetaminophen. If NSAID use is necessary, monitor INR closely."
+                    },
+                    "aspirin": {
+                        severity: "high",
+                        description: "Increased risk of bleeding",
+                        mechanism: "Aspirin inhibits platelet function and can increase the anticoagulant effect of warfarin.",
+                        management: "Avoid concurrent use unless specifically indicated (e.g., mechanical heart valves)."
+                    },
+                    "omeprazole": {
+                        severity: "medium",
+                        description: "Potential increased INR",
+                        mechanism: "Omeprazole may inhibit CYP2C19, potentially increasing warfarin levels.",
+                        management: "Monitor INR when starting or stopping omeprazole."
+                    }
+                }
+            },
+            "ibuprofen": {
+                name: "Ibuprofen",
+                type: "NSAID",
+                interactions: {
+                    "lisinopril": {
+                        severity: "medium",
+                        description: "Reduced antihypertensive effect",
+                        mechanism: "NSAIDs may diminish the antihypertensive effect of ACE inhibitors like lisinopril.",
+                        management: "Monitor blood pressure; consider alternative pain relievers if needed."
+                    },
+                    "furosemide": {
+                        severity: "medium",
+                        description: "Reduced diuretic effect",
+                        mechanism: "NSAIDs can reduce the natriuretic effect of diuretics.",
+                        management: "Monitor for edema and blood pressure."
+                    }
+                }
+            },
+            "lisinopril": {
+                name: "Lisinopril",
+                type: "ACE Inhibitor",
+                interactions: {
+                    "ibuprofen": {
+                        severity: "medium",
+                        description: "Reduced antihypertensive effect",
+                        mechanism: "NSAIDs may diminish the antihypertensive effect of ACE inhibitors.",
+                        management: "Monitor blood pressure; consider alternative pain relievers if needed."
+                    },
+                    "spironolactone": {
+                        severity: "high",
+                        description: "Risk of hyperkalemia",
+                        mechanism: "Concurrent use increases risk of hyperkalemia.",
+                        management: "Monitor potassium levels closely."
+                    }
+                }
+            },
+            "omeprazole": {
+                name: "Omeprazole",
+                type: "PPI",
+                interactions: {
+                    "warfarin": {
+                        severity: "medium",
+                        description: "Potential increased INR",
+                        mechanism: "Omeprazole may inhibit CYP2C19, potentially increasing warfarin levels.",
+                        management: "Monitor INR when starting or stopping omeprazole."
+                    },
+                    "clopidogrel": {
+                        severity: "high",
+                        description: "Reduced antiplatelet effect",
+                        mechanism: "Omeprazole may reduce the antiplatelet effect of clopidogrel.",
+                        management: "Consider alternative acid suppressants like pantoprazole."
+                    }
+                }
+            },
+            "simvastatin": {
+                name: "Simvastatin",
+                type: "Statin",
+                interactions: {
+                    "clarithromycin": {
+                        severity: "high",
+                        description: "Increased risk of myopathy",
+                        mechanism: "Clarithromycin inhibits CYP3A4 metabolism of simvastatin, increasing statin levels.",
+                        management: "Avoid concomitant use or consider alternative statin."
+                    }
+                }
+            },
+            "fluoxetine": {
+                name: "Fluoxetine",
+                type: "SSRI",
+                interactions: {
+                    "tramadol": {
+                        severity: "high",
+                        description: "Increased seizure risk",
+                        mechanism: "Fluoxetine may increase tramadol levels and lower seizure threshold.",
+                        management: "Consider alternative analgesic or antidepressant."
+                    }
+                }
+            }
+        };
+
+        // DOM Elements
+        const drugSearch = document.getElementById('drug-search');
+        const searchResults = document.getElementById('search-results');
+        const medicationList = document.getElementById('medication-list');
+        const addMedBtn = document.getElementById('add-med-btn');
+        const checkInteractionsBtn = document.getElementById('check-interactions');
+        const resultsContainer = document.getElementById('results-container');
+        const severityLegend = document.getElementById('severity-legend');
+        const demoBtn = document.getElementById('demo-btn');
+        const patientAge = document.getElementById('patient-age');
+        const patientWeight = document.getElementById('patient-weight');
+        const patientConditions = document.getElementById('patient-conditions');
+
+        // Current medications
+        let medications = [];
+
+        // Event Listeners
+        drugSearch.addEventListener('input', handleDrugSearch);
+        addMedBtn.addEventListener('click', addBlankMedication);
+        checkInteractionsBtn.addEventListener('click', checkInteractions);
+        demoBtn.addEventListener('click', loadDemoData);
+        document.getElementById('export-btn').addEventListener('click', exportToExcel);
+
+        // Functions
+        function handleDrugSearch(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            
+            if (searchTerm.length < 2) {
+                searchResults.classList.add('hidden');
+                return;
+            }
+            
+            const matches = Object.keys(drugDatabase).filter(drug => 
+                drug.includes(searchTerm) || drugDatabase[drug].name.toLowerCase().includes(searchTerm)
+            );
+            
+            if (matches.length > 0) {
+                searchResults.innerHTML = matches.map(drug => `
+                    <div class="p-3 hover:bg-gray-100 cursor-pointer" onclick="selectDrug('${drug}')">
+                        <div class="font-medium">${drugDatabase[drug].name}</div>
+                        <div class="text-sm text-gray-500">${drugDatabase[drug].type}</div>
+                    </div>
+                `).join('');
+                searchResults.classList.remove('hidden');
+            } else {
+                searchResults.innerHTML = '<div class="p-3 text-gray-500">No medications found</div>';
+                searchResults.classList.remove('hidden');
+            }
+        }
+
+        function selectDrug(drugKey) {
+            const drug = drugDatabase[drugKey];
+            addMedication(drug.name, drugKey);
+            drugSearch.value = '';
+            searchResults.classList.add('hidden');
+            drugSearch.focus();
+        }
+
+        function addBlankMedication() {
+            const id = Date.now();
+            medications.push({ id, name: '', key: '' });
+            renderMedicationList();
+            
+            // Focus the last added medication input
+            setTimeout(() => {
+                const inputs = document.querySelectorAll('.med-name-input');
+                if (inputs.length > 0) {
+                    inputs[inputs.length - 1].focus();
+                }
+            }, 0);
+        }
+
+        function addMedication(name, key) {
+            const id = Date.now();
+            medications.push({ id, name, key });
+            renderMedicationList();
+        }
+
+        function renderMedicationList() {
+            medicationList.innerHTML = medications.map(med => `
+                <div class="drug-card bg-white p-4 rounded-lg border border-gray-200 flex items-center justify-between">
+                    <div class="flex items-center w-full">
+                        <i class="fas fa-pills text-gray-400 mr-3"></i>
+                        <input type="text" 
+                               class="med-name-input medication-input w-full bg-transparent focus:outline-none" 
+                               value="${med.name}" 
+                               placeholder="Enter medication name"
+                               onchange="updateMedication(${med.id}, this.value)">
+                    </div>
+                    <button onclick="removeMedication(${med.id})" class="ml-4 text-red-500 hover:text-red-700">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        function updateMedication(id, newName) {
+            const medIndex = medications.findIndex(m => m.id === id);
+            if (medIndex !== -1) {
+                // Try to find a match in our database
+                const foundDrug = Object.entries(drugDatabase).find(
+                    ([key, drug]) => drug.name.toLowerCase() === newName.toLowerCase()
+                );
+                
+                if (foundDrug) {
+                    medications[medIndex] = { 
+                        id, 
+                        name: foundDrug[1].name, 
+                        key: foundDrug[0] 
+                    };
+                } else {
+                    medications[medIndex] = { 
+                        id, 
+                        name: newName, 
+                        key: '' 
+                    };
+                }
+            }
+            renderMedicationList();
+        }
+
+        function removeMedication(id) {
+            medications = medications.filter(m => m.id !== id);
+            renderMedicationList();
+        }
+
+        // Chart instances
+        let severityChart, networkChart, timelineChart;
+
+        function checkInteractions() {
+            // Filter out empty medications
+            medications = medications.filter(m => m.name.trim() !== '');
+            
+            // Destroy previous charts if they exist
+            if (severityChart) severityChart.destroy();
+            if (networkChart) networkChart.destroy();
+            if (timelineChart) timelineChart.destroy();
+            
+            if (medications.length < 2) {
+                showAlert('Please add at least two medications to check for interactions.', 'info');
+                return;
+            }
+            
+            // Clear previous results
+            resultsContainer.innerHTML = '';
+            
+            // Find all interactions
+            const allInteractions = [];
+            
+            for (let i = 0; i < medications.length; i++) {
+                for (let j = i + 1; j < medications.length; j++) {
+                    const med1 = medications[i];
+                    const med2 = medications[j];
+                    
+                    // Check both directions (med1 with med2 and med2 with med1)
+                    const interaction1 = checkInteraction(med1, med2);
+                    const interaction2 = checkInteraction(med2, med1);
+                    
+                    if (interaction1) allInteractions.push(interaction1);
+                    if (interaction2) allInteractions.push(interaction2);
+                }
+            }
+            
+            // Sort by severity (high to low)
+            const severityOrder = { high: 3, medium: 2, low: 1, info: 0 };
+            allInteractions.sort((a, b) => severityOrder[b.severity] - severityOrder[a.severity]);
+            
+            // Create visualizations
+            createSeverityChart(allInteractions);
+            createNetworkChart(allInteractions);
+            createTimelineChart(allInteractions);
+            
+            // Display results
+            if (allInteractions.length === 0) {
+                resultsContainer.innerHTML = `
+                    <div class="text-center py-10 text-green-500 fade-in">
+                        <i class="fas fa-check-circle fa-3x mb-4"></i>
+                        <p class="text-lg">No significant interactions found between these medications</p>
+                    </div>
+                `;
+            } else {
+                allInteractions.forEach(interaction => {
+                    const severityClass = `severity-${interaction.severity}`;
+                    const severityColor = {
+                        high: 'red',
+                        medium: 'yellow',
+                        low: 'green',
+                        info: 'blue'
+                    }[interaction.severity];
+                    
+                    resultsContainer.innerHTML += `
+                        <div class="interaction-card ${severityClass} bg-white p-5 rounded-lg shadow-sm fade-in">
+                            <div class="flex items-start">
+                                <div class="mr-4 mt-1">
+                                    <i class="fas fa-exclamation-triangle text-${severityColor}-500 text-xl"></i>
+                                </div>
+                                <div>
+                                    <div class="flex items-center mb-2">
+                                        <span class="px-2 py-1 bg-${severityColor}-100 text-${severityColor}-800 text-xs font-medium rounded mr-2">${interaction.severity.toUpperCase()}</span>
+                                        <h3 class="font-medium text-gray-800">${interaction.description}</h3>
+                                    </div>
+                                    <div class="mb-3">
+                                        <span class="font-medium">Between:</span> 
+                                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm ml-2">${interaction.drug1}</span> 
+                                        <span class="mx-1 text-gray-400">and</span> 
+                                        <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm">${interaction.drug2}</span>
+                                    </div>
+                                    <div class="mb-3">
+                                        <div class="text-sm font-medium text-gray-700 mb-1">Mechanism:</div>
+                                        <div class="text-sm text-gray-600">${interaction.mechanism}</div>
+                                    </div>
+                                    <div>
+                                        <div class="text-sm font-medium text-gray-700 mb-1">Management:</div>
+                                        <div class="text-sm text-gray-600">${interaction.management}</div>
+                                    </div>
+                                    ${interaction.alternatives ? `
+                                    <div class="mt-3">
+                                        <div class="text-sm font-medium text-gray-700 mb-1">Safer Alternatives:</div>
+                                        <div class="text-sm text-gray-600">${interaction.alternatives}</div>
+                                    </div>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                // Show severity legend
+                severityLegend.classList.remove('hidden');
+                
+                // If high severity interactions exist, pulse the check button
+                if (allInteractions.some(i => i.severity === 'high')) {
+                    checkInteractionsBtn.classList.add('warning-pulse');
+                }
+            }
+            
+            // Consider patient factors
+            considerPatientFactors();
+        }
+
+        function checkInteraction(med1, med2) {
+            // Only check if we have a key for the medication in our database
+            if (!med1.key || !med2.key) return null;
+            
+            const drug1Data = drugDatabase[med1.key];
+            
+            if (drug1Data.interactions && drug1Data.interactions[med2.key]) {
+                const interaction = drug1Data.interactions[med2.key];
+                
+                // Add some patient-specific considerations
+                let additionalInfo = '';
+                const age = parseInt(patientAge.value);
+                const weight = parseInt(patientWeight.value);
+                const conditions = patientConditions.value.toLowerCase();
+                
+                if (interaction.severity === 'high' && age > 65) {
+                    additionalInfo += " Elderly patients are at particularly high risk for this interaction.";
+                }
+                
+                if (interaction.description.includes('bleeding') && conditions.includes('peptic ulcer')) {
+                    additionalInfo += " Patient with history of peptic ulcer disease is at increased bleeding risk.";
+                }
+                
+                if (interaction.description.includes('hyperkalemia') && conditions.includes('kidney') || conditions.includes('renal')) {
+                    additionalInfo += " Patients with renal impairment are at increased risk for hyperkalemia.";
+                }
+                
+                // Add alternatives for high severity interactions
+                let alternatives = '';
+                if (interaction.severity === 'high') {
+                    if (med1.key === 'warfarin' && med2.key === 'ibuprofen') {
+                        alternatives = "Acetaminophen (Tylenol) is a safer alternative for pain relief.";
+                    } else if (med1.key === 'simvastatin' && med2.key === 'clarithromycin') {
+                        alternatives = "Consider using pravastatin or rosuvastatin which have less CYP3A4 interaction potential.";
+                    }
+                }
+                
+                return {
+                    drug1: med1.name,
+                    drug2: med2.name,
+                    severity: interaction.severity,
+                    description: interaction.description,
+                    mechanism: interaction.mechanism + additionalInfo,
+                    management: interaction.management,
+                    alternatives: alternatives
+                };
+            }
+            
+            return null;
+        }
+
+        function considerPatientFactors() {
+            const age = parseInt(patientAge.value);
+            const weight = parseInt(patientWeight.value);
+            const conditions = patientConditions.value.toLowerCase();
+            
+            if (isNaN(age) && isNaN(weight) && !conditions) return;
+            
+            let patientSpecificNotes = [];
+            
+            // Age considerations
+            if (!isNaN(age) && age > 65) {
+                patientSpecificNotes.push("Elderly patients may be more sensitive to drug effects and interactions.");
+            }
+            
+            // Weight considerations
+            if (!isNaN(weight)) {
+                if (weight < 50) {
+                    patientSpecificNotes.push("Low body weight may increase sensitivity to certain medications.");
+                } else if (weight > 100) {
+                    patientSpecificNotes.push("Higher body weight may affect drug distribution and dosing requirements.");
+                }
+            }
+            
+            // Condition considerations
+            if (conditions) {
+                if (conditions.includes('liver') || conditions.includes('hepatic')) {
+                    patientSpecificNotes.push("Liver disease may affect drug metabolism and increase risk of adverse effects.");
+                }
+                
+                if (conditions.includes('kidney') || conditions.includes('renal')) {
+                    patientSpecificNotes.push("Renal impairment may affect drug excretion and increase risk of toxicity.");
+                }
+                
+                if (conditions.includes('diabetes')) {
+                    patientSpecificNotes.push("Diabetic patients may require closer monitoring with certain medications.");
+                }
+            }
+            
+            if (patientSpecificNotes.length > 0) {
+                const patientNote = document.createElement('div');
+                patientNote.className = 'interaction-card severity-info bg-white p-5 rounded-lg shadow-sm fade-in mt-6';
+                patientNote.innerHTML = `
+                    <div class="flex items-start">
+                        <div class="mr-4 mt-1">
+                            <i class="fas fa-user-md text-blue-500 text-xl"></i>
+                        </div>
+                        <div>
+                            <h3 class="font-medium text-gray-800 mb-3">Patient-Specific Considerations</h3>
+                            <ul class="list-disc pl-5 space-y-1 text-sm text-gray-600">
+                                ${patientSpecificNotes.map(note => `<li>${note}</li>`).join('')}
+                            </ul>
+                        </div>
+                    </div>
+                `;
+                
+                resultsContainer.appendChild(patientNote);
+            }
+        }
+
+        function showAlert(message, type) {
+            const alert = document.createElement('div');
+            alert.className = `fixed top-4 right-4 px-6 py-4 rounded-lg shadow-lg bg-${type === 'error' ? 'red' : type === 'success' ? 'green' : 'blue'}-500 text-white flex items-center justify-between z-50 fade-in`;
+            alert.innerHTML = `
+                <div class="flex items-center">
+                    <i class="fas ${type === 'error' ? 'fa-exclamation-circle' : type === 'success' ? 'fa-check-circle' : 'fa-info-circle'} mr-3"></i>
+                    <span>${message}</span>
+                </div>
+                <button class="ml-4" onclick="this.parentElement.remove()">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            document.body.appendChild(alert);
+            
+            setTimeout(() => {
+                alert.remove();
+            }, 5000);
+        }
+
+        // Export to Excel function
+        function exportToExcel() {
+            // Get patient data
+            const patientData = {
+                name: "Patient", // You could add a name field if needed
+                age: patientAge.value,
+                weight: patientWeight.value,
+                conditions: patientConditions.value,
+                medications: medications.map(m => m.name).join(", "),
+                interactions: []
+            };
+
+            // Get interaction data if available
+            const interactionElements = document.querySelectorAll('.interaction-card');
+            interactionElements.forEach(el => {
+                const severity = el.querySelector('span:first-child').textContent;
+                const description = el.querySelector('h3').textContent;
+                const drugs = Array.from(el.querySelectorAll('.bg-blue-100')).map(d => d.textContent).join(" and ");
+                
+                patientData.interactions.push({
+                    severity,
+                    description,
+                    drugs
+                });
+            });
+
+            // Create worksheet
+            const ws = XLSX.utils.json_to_sheet([
+                { "Category": "Patient Information", "Value": "" },
+                { "Category": "Age", "Value": patientData.age },
+                { "Category": "Weight (kg)", "Value": patientData.weight },
+                { "Category": "Conditions", "Value": patientData.conditions },
+                { "Category": "Medications", "Value": patientData.medications },
+                { "Category": "", "Value": "" },
+                { "Category": "Interaction Results", "Value": "" }
+            ]);
+
+            // Add interaction data
+            XLSX.utils.sheet_add_json(ws, patientData.interactions, { skipHeader: true, origin: -1 });
+
+            // Create workbook
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Patient Report");
+
+            // Export file
+            XLSX.writeFile(wb, `MedSafe_Patient_Report_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        function loadDemoData() {
+            medications = [
+                { id: 1, name: "Warfarin", key: "warfarin" },
+                { id: 2, name: "Ibuprofen", key: "ibuprofen" },
+                { id: 3, name: "Omeprazole", key: "omeprazole" }
+            ];
+            
+            patientAge.value = "68";
+            patientWeight.value = "72";
+            patientConditions.value = "Hypertension, GERD";
+            
+            renderMedicationList();
+            showAlert("Demo data loaded. Click 'Check Interactions' to analyze.", 'info');
+        }
+
+        // Chatbot functionality
+        const chatbotToggle = document.getElementById('chatbot-toggle');
+        const chatbotContainer = document.getElementById('chatbot-container');
+        const closeChatbot = document.getElementById('close-chatbot');
+        const chatbotMessages = document.getElementById('chatbot-messages');
+        const chatbotInput = document.getElementById('chatbot-input');
+        const sendChatbot = document.getElementById('send-chatbot');
+
+        chatbotToggle.addEventListener('click', () => {
+            chatbotContainer.classList.toggle('hidden');
+        });
+
+        closeChatbot.addEventListener('click', () => {
+            chatbotContainer.classList.add('hidden');
+        });
+
+        sendChatbot.addEventListener('click', sendMessage);
+        chatbotInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        function sendMessage() {
+            const message = chatbotInput.value.trim();
+            if (!message) return;
+
+            // Add user message
+            addMessage(message, 'user');
+            chatbotInput.value = '';
+
+            // Simulate AI thinking
+            setTimeout(() => {
+                const response = generateAIResponse(message);
+                addMessage(response, 'bot');
+            }, 500);
+        }
+
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chatbot-message ${sender === 'user' ? 'user-message' : 'bg-blue-100 text-blue-800'} p-3 rounded-lg mb-2`;
+            messageDiv.innerHTML = `<p>${text}</p>`;
+            chatbotMessages.appendChild(messageDiv);
+            chatbotMessages.scrollTop = chatbotMessages.scrollHeight;
+        }
+
+        function createSeverityChart(interactions) {
+            const severityCounts = {
+                high: 0,
+                medium: 0,
+                low: 0,
+                info: 0
+            };
+            
+            interactions.forEach(i => severityCounts[i.severity]++);
+            
+            const ctx = document.getElementById('severityChart').getContext('2d');
+            severityChart = new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: ['High Risk', 'Medium Risk', 'Low Risk', 'Information'],
+                    datasets: [{
+                        data: [severityCounts.high, severityCounts.medium, severityCounts.low, severityCounts.info],
+                        backgroundColor: [
+                            'rgba(239, 68, 68, 0.7)',
+                            'rgba(245, 158, 11, 0.7)',
+                            'rgba(16, 185, 129, 0.7)',
+                            'rgba(59, 130, 246, 0.7)'
+                        ],
+                        borderColor: [
+                            'rgba(239, 68, 68, 1)',
+                            'rgba(245, 158, 11, 1)',
+                            'rgba(16, 185, 129, 1)',
+                            'rgba(59, 130, 246, 1)'
+                        ],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'right',
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.raw || 0;
+                                    const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                    const percentage = Math.round((value / total) * 100);
+                                    return `${label}: ${value} (${percentage}%)`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createNetworkChart(interactions) {
+            const drugs = [...new Set(interactions.flatMap(i => [i.drug1, i.drug2]))];
+            const nodes = drugs.map(drug => ({ id: drug, label: drug }));
+            
+            const edges = interactions.map(i => ({
+                from: i.drug1,
+                to: i.drug2,
+                label: i.severity,
+                color: {
+                    high: 'rgba(239, 68, 68, 0.7)',
+                    medium: 'rgba(245, 158, 11, 0.7)',
+                    low: 'rgba(16, 185, 129, 0.7)',
+                    info: 'rgba(59, 130, 246, 0.7)'
+                }[i.severity],
+                width: {
+                    high: 3,
+                    medium: 2,
+                    low: 1,
+                    info: 1
+                }[i.severity]
+            }));
+            
+            const ctx = document.getElementById('networkChart').getContext('2d');
+            networkChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: edges.map(edge => ({
+                        label: `${edge.from} ↔ ${edge.to}`,
+                        data: [{
+                            x: drugs.indexOf(edge.from),
+                            y: drugs.indexOf(edge.to),
+                            r: 10
+                        }],
+                        backgroundColor: edge.color,
+                        borderColor: edge.color,
+                        borderWidth: edge.width,
+                        pointRadius: 8
+                    }))
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: { display: true, text: 'Medications' },
+                            ticks: {
+                                callback: function(val) {
+                                    return drugs[val];
+                                }
+                            }
+                        },
+                        y: {
+                            title: { display: true, text: 'Interacts With' },
+                            ticks: {
+                                callback: function(val) {
+                                    return drugs[val];
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Interaction: ${context.dataset.label}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createTimelineChart(interactions) {
+            const ctx = document.getElementById('timelineChart').getContext('2d');
+            timelineChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: interactions.map(i => `${i.drug1} + ${i.drug2}`),
+                    datasets: [{
+                        label: 'Interaction Severity',
+                        data: interactions.map(i => ({
+                            x: `${i.drug1} + ${i.drug2}`,
+                            y: {
+                                high: 3,
+                                medium: 2,
+                                low: 1,
+                                info: 0
+                            }[i.severity],
+                            severity: i.severity
+                        })),
+                        backgroundColor: interactions.map(i => ({
+                            high: 'rgba(239, 68, 68, 0.7)',
+                            medium: 'rgba(245, 158, 11, 0.7)',
+                            low: 'rgba(16, 185, 129, 0.7)',
+                            info: 'rgba(59, 130, 246, 0.7)'
+                        }[i.severity])),
+                        borderColor: interactions.map(i => ({
+                            high: 'rgba(239, 68, 68, 1)',
+                            medium: 'rgba(245, 158, 11, 1)',
+                            low: 'rgba(16, 185, 129, 1)',
+                            info: 'rgba(59, 130, 246, 1)'
+                        }[i.severity])),
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return {
+                                        0: 'Info',
+                                        1: 'Low',
+                                        2: 'Medium',
+                                        3: 'High'
+                                    }[value];
+                                }
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `Severity: ${context.raw.severity}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Common user problems dataset
+        const commonProblems = [
+            {
+                keywords: ['interaction', 'mix', 'combine', 'together'],
+                response: "Drug interactions occur when medications affect each other's effectiveness or cause side effects. Our interaction checker can analyze your medication list for potential issues. Would you like me to check your current medications?",
+                followUp: "You can add your medications above and click 'Check Interactions' for a detailed analysis."
+            },
+            {
+                keywords: ['side effect', 'adverse', 'nausea', 'dizziness', 'headache'],
+                response: "Common side effects include nausea, dizziness, headache, or fatigue. Serious side effects like difficulty breathing or swelling should be reported immediately. Which medication are you concerned about?",
+                followUp: "For <medication>, common side effects are <list>. Always report severe reactions to your doctor."
+            },
+            {
+                keywords: ['warfarin', 'blood thinner', 'coumadin'],
+                response: "Warfarin requires careful monitoring as it interacts with many foods (especially vitamin K-rich foods) and medications. Avoid sudden dietary changes and always check new medications for interactions.",
+                followUp: "Would you like me to check if any of your medications interact with warfarin?"
+            },
+            {
+                keywords: ['alternative', 'replace', 'substitute', 'instead'],
+                response: "For <medication>, possible alternatives may include <alternatives>. However, you should always consult your healthcare provider before changing medications.",
+                followUp: "I can suggest alternatives but a doctor should approve any changes to your regimen."
+            },
+            {
+                keywords: ['take', 'when', 'time', 'morning', 'night'],
+                response: "Medication timing depends on the drug. Some are best taken in the morning, others at night. <Medication> is typically taken <time> because <reason>.",
+                followUp: "Check the prescription label or ask your pharmacist for specific timing instructions."
+            },
+            {
+                keywords: ['forget', 'missed', 'skip', 'double'],
+                response: "If you forget a dose: <guidance>. Never double up unless instructed by your doctor. For <medication>, the specific guidance is <details>.",
+                followUp: "Setting reminders can help prevent missed doses."
+            },
+            {
+                keywords: ['food', 'eat', 'drink', 'alcohol'],
+                response: "Some medications interact with food or drink. <Medication> should be taken <with/without> food because <reason>. Alcohol may <effect> with this medication.",
+                followUp: "Would you like specific food interaction details for any of your medications?"
+            },
+            {
+                keywords: ['cost', 'expensive', 'cheaper', 'insurance'],
+                response: "For cost concerns, options include generic versions, manufacturer coupons, or patient assistance programs. GoodRx often has discount prices.",
+                followUp: "I can help you find cost-saving options for specific medications."
+            }
+        ];
+
+        // Medication-specific knowledge base
+        const medicationKnowledge = {
+            'warfarin': {
+                sideEffects: "unusual bleeding, bruising, red or brown urine",
+                timing: "at the same time each day, usually in the evening",
+                foodInteractions: "avoid large changes in vitamin K intake (leafy greens), limit alcohol",
+                alternatives: "other anticoagulants like apixaban, rivaroxaban (but consult your doctor)"
+            },
+            'ibuprofen': {
+                sideEffects: "stomach pain, heartburn, dizziness",
+                timing: "with food or milk to reduce stomach upset",
+                foodInteractions: "avoid alcohol (increases stomach bleeding risk)",
+                alternatives: "acetaminophen for pain, but not for anti-inflammatory effects"
+            },
+            // Add more medications as needed
+        };
+
+        function generateAIResponse(message) {
+            const lowerMessage = message.toLowerCase();
+            const currentMeds = medications.map(m => m.name.toLowerCase());
+            
+            // Check for medication-specific questions first
+            for (const med in medicationKnowledge) {
+                if (lowerMessage.includes(med)) {
+                    const info = medicationKnowledge[med];
+                    if (lowerMessage.includes('side effect')) {
+                        return `For ${med}, common side effects include ${info.sideEffects}. Report any severe reactions to your doctor immediately.`;
+                    }
+                    if (lowerMessage.includes('take') || lowerMessage.includes('when')) {
+                        return `${med} should be taken ${info.timing}.`;
+                    }
+                    if (lowerMessage.includes('food') || lowerMessage.includes('eat')) {
+                        return `Food interactions with ${med}: ${info.foodInteractions}.`;
+                    }
+                }
+            }
+            
+            // Check for common problem patterns
+            for (const problem of commonProblems) {
+                if (problem.keywords.some(keyword => lowerMessage.includes(keyword))) {
+                    let response = problem.response;
+                    
+                    // Personalize response if medications are listed
+                    if (currentMeds.length > 0) {
+                        // Try to find mentioned medication in the message
+                        const mentionedMeds = currentMeds.filter(med => lowerMessage.includes(med));
+                        if (mentionedMeds.length > 0) {
+                            const med = mentionedMeds[0];
+                            const medInfo = medicationKnowledge[med] || {};
+                            response = response
+                                .replace('<medication>', med)
+                                .replace('<list>', medInfo.sideEffects || 'various potential effects')
+                                .replace('<time>', medInfo.timing || 'as prescribed')
+                                .replace('<reason>', medInfo.foodInteractions || 'this affects absorption');
+                        }
+                    }
+                    
+                    return response + (problem.followUp ? ' ' + problem.followUp : '');
+                }
+            }
+            
+            // Default response
+            return "I'm an AI assistant trained on medication safety. I can help with: drug interactions, side effects, timing, alternatives, and more. How can I assist you with your medications?";
+        }
+    </script>
+</body>
+</html>
